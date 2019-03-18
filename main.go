@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/therecipe/qt/core"
 	"github.com/therecipe/qt/gui"
 	"github.com/therecipe/qt/widgets"
 
@@ -47,7 +46,7 @@ const (
 
 var (
 	typesShortForms = []Integer{MAL_FLOAT_TYPE_SHORT_FORM}
-	shortForms = []Long{MAL_FLOAT_SHORT_FORM}
+	shortForms      = []Long{MAL_FLOAT_SHORT_FORM}
 )
 
 // isDatabaseInitialized attribute is true when the database has been initialized
@@ -78,12 +77,22 @@ func main() {
 		Result            = widgets.NewQTextEdit(nil)
 		Network           = widgets.NewQLineEdit(nil)
 		Provider          = widgets.NewQLineEdit(nil)
+		Related           = widgets.NewQLineEdit(nil)
+		Source            = widgets.NewQLineEdit(nil)
+		startTime         = widgets.NewQLineEdit(nil)
+		endTime           = widgets.NewQLineEdit(nil)
+		sortOrder         = widgets.NewQCheckBox2("Sort Order", nil)
+		sortFieldName     = widgets.NewQCheckBox2("Sort Field Name", nil)
 	)
-	validatorComboBox.AddItems([]string{"Retrieve", "Store", "Count"})
+	validatorComboBox.AddItems([]string{"Retrieve", "Store", "Count", "Query"})
 	ID1.SetPlaceholderText("identificator 1")
 	ID2.SetPlaceholderText("identificator 2")
 	ID3.SetPlaceholderText("identificator 3")
 	ID4.SetPlaceholderText("identificator 4")
+	Related.SetPlaceholderText("relation")
+	Source.SetPlaceholderText("source")
+	startTime.SetPlaceholderText("start-time")
+	endTime.SetPlaceholderText("end-time")
 	ID1.SetText("en")
 	ID2.SetText("cnes")
 	ID3.SetText("archiveservice")
@@ -91,23 +100,27 @@ func main() {
 	Provider.SetPlaceholderText("provider")
 	Value.SetValidator(gui.NewQDoubleValidator(Value))
 	Value.SetPlaceholderText("value to store")
-	Result.SetReadOnly(true)
-	Value.SetReadOnly(true)
-	Provider.SetReadOnly(true)
-	Network.SetReadOnly(true)
+
+	Related.SetReadOnly(true)
+	Source.SetReadOnly(true)
+	startTime.SetReadOnly(true)
+	endTime.SetReadOnly(true)
+	sortOrder.SetCheckable(false)
+	sortFieldName.SetCheckable(false)
 	var (
-		alignmentGroup    = widgets.NewQGroupBox2("Alignment", nil)
-		alignmentLabel    = widgets.NewQLabel2("Type:", nil, 0)
-		alignmentComboBox = widgets.NewQComboBox(nil)
-		alignmentLineEdit = widgets.NewQLineEdit(nil)
+		QueryGroup    = widgets.NewQGroupBox2("Query", nil)
+		QueryLabel    = widgets.NewQLabel2("Type:", nil, 0)
+		QueryComboBox = widgets.NewQComboBox(nil)
+		QueryLineEdit = widgets.NewQLineEdit(nil)
 	)
-	alignmentComboBox.AddItems([]string{"Left", "Centered", "Right"})
-	alignmentLineEdit.SetPlaceholderText("Placeholder Text")
+	QueryComboBox.AddItems([]string{"Left", "Centered", "Right"})
+	QueryLineEdit.SetPlaceholderText("Placeholder Text")
 
 	validatorComboBox.ConnectCurrentIndexChanged(func(index int) {
-		validatorChanged(ID1, ID2, ID3, ID4, ButtonOperation, Value, Provider, Network, index)
+		validatorChanged(ID1, ID2, ID3, ID4, ButtonOperation, Value, Provider, Network, Related, Source, startTime, endTime, sortOrder,
+			sortFieldName, index)
 	})
-	alignmentComboBox.ConnectCurrentIndexChanged(func(index int) { alignmentChanged(alignmentLineEdit, index) })
+	QueryComboBox.ConnectCurrentIndexChanged(func(index int) { QueryChanged(QueryLineEdit, index) })
 	pushButton.ConnectClicked(func(checked bool) {
 		err := checkAndInitDatabase()
 		if err != nil {
@@ -133,10 +146,17 @@ func main() {
 	retrieveLayout.AddWidget3(Value, 2, 1, 1, 2, 0)
 	retrieveLayout.AddWidget3(Provider, 2, 3, 1, 2, 0)
 	retrieveLayout.AddWidget3(Network, 2, 5, 1, 2, 0)
-	retrieveLayout.AddWidget(ButtonOperation, 3, 1, 0)
-	retrieveLayout.AddWidget(Result, 4, 1, 0)
+	retrieveLayout.AddWidget3(Related, 3, 1, 1, 2, 0)
+	retrieveLayout.AddWidget3(Source, 3, 3, 1, 2, 0)
+	retrieveLayout.AddWidget3(startTime, 3, 5, 1, 2, 0)
+	retrieveLayout.AddWidget3(endTime, 3, 7, 1, 2, 0)
+	retrieveLayout.AddWidget3(sortFieldName, 4, 1, 1, 2, 0)
+	retrieveLayout.AddWidget3(sortOrder, 4, 3, 1, 2, 0)
+	retrieveLayout.AddWidget(ButtonOperation, 5, 1, 0)
+	retrieveLayout.AddWidget(Result, 6, 1, 0)
 	ButtonOperation.ConnectClicked(func(checked bool) {
 		var params []string
+		var paramsQuery []string
 		if ID1.Text() != "" {
 			params = append(params, ID1.Text())
 		}
@@ -149,6 +169,18 @@ func main() {
 		if ID4.Text() != "" {
 			params = append(params, ID4.Text())
 		}
+		if Related.Text() != "" {
+			paramsQuery = append(paramsQuery, Related.Text())
+		}
+		if Source.Text() != "" {
+			paramsQuery = append(paramsQuery, Source.Text())
+		}
+		if startTime.Text() != "" {
+			paramsQuery = append(paramsQuery, startTime.Text())
+		}
+		if endTime.Text() != "" {
+			paramsQuery = append(paramsQuery, endTime.Text())
+		}
 		if validatorComboBox.CurrentIndex() == 0 {
 			Result.SetText(TestRetrieveOK(params))
 		}
@@ -159,22 +191,25 @@ func main() {
 			Result.SetText(TestStoreOK(params, newValue, newProvider, newNetwork))
 		}
 		if validatorComboBox.CurrentIndex() == 2 {
-			Result.SetText(strconv.FormatInt(int64(Count(params)),10))
+			Result.SetText(strconv.FormatInt(int64(Count(params)), 10))
+		}
+		if validatorComboBox.CurrentIndex() == 3 {
+			Result.SetText(strconv.FormatInt(int64(Count(params)), 10))
 		}
 
 	})
 	validatorGroup.SetLayout(retrieveLayout)
 
-	var alignmentLayout = widgets.NewQGridLayout2()
-	alignmentLayout.AddWidget(alignmentLabel, 0, 0, 0)
-	alignmentLayout.AddWidget(alignmentComboBox, 0, 1, 0)
-	alignmentLayout.AddWidget3(alignmentLineEdit, 1, 0, 1, 2, 0)
-	alignmentGroup.SetLayout(alignmentLayout)
+	var QueryLayout = widgets.NewQGridLayout2()
+	QueryLayout.AddWidget(QueryLabel, 0, 0, 0)
+	QueryLayout.AddWidget(QueryComboBox, 0, 1, 0)
+	QueryLayout.AddWidget3(QueryLineEdit, 1, 0, 1, 2, 0)
+	QueryGroup.SetLayout(QueryLayout)
 
 	var layout = widgets.NewQGridLayout2()
 	layout.AddWidget(InitDB, 0, 0, 0)
 	layout.AddWidget(validatorGroup, 1, 0, 0)
-	layout.AddWidget(alignmentGroup, 2, 0, 0)
+	layout.AddWidget(QueryGroup, 2, 0, 0)
 
 	var window = widgets.NewQMainWindow(nil, 0)
 	window.SetWindowTitle("Archive Service")
@@ -189,10 +224,18 @@ func main() {
 }
 
 func validatorChanged(ID1 *widgets.QLineEdit, ID2 *widgets.QLineEdit, ID3 *widgets.QLineEdit, ID4 *widgets.QLineEdit, ButtonOperation *widgets.QPushButton,
-	Value *widgets.QLineEdit, Provider *widgets.QLineEdit, Network *widgets.QLineEdit, index int) {
+	Value *widgets.QLineEdit, Provider *widgets.QLineEdit, Network *widgets.QLineEdit,
+	Related *widgets.QLineEdit, Source *widgets.QLineEdit, startTime *widgets.QLineEdit, endTime *widgets.QLineEdit,
+	sortOrder *widgets.QCheckBox, sortFieldName *widgets.QCheckBox, index int) {
 	switch index {
 	case 0:
 		{
+			Related.SetReadOnly(true)
+			Source.SetReadOnly(true)
+			startTime.SetReadOnly(true)
+			endTime.SetReadOnly(true)
+			sortOrder.SetCheckable(false)
+			sortFieldName.SetCheckable(false)
 			Value.SetReadOnly(true)
 			Provider.SetReadOnly(true)
 			Network.SetReadOnly(true)
@@ -207,39 +250,58 @@ func validatorChanged(ID1 *widgets.QLineEdit, ID2 *widgets.QLineEdit, ID3 *widge
 			Value.SetReadOnly(false)
 			Provider.SetReadOnly(false)
 			Network.SetReadOnly(false)
-			ID1.Clear()
-			ID2.Clear()
-			ID3.Clear()
-			ID4.Clear()
 			ButtonOperation.SetText("Store")
 
 		}
 
 	case 2:
 		{
-			ButtonOperation.SetText("Count")
 
+			ButtonOperation.SetText("Count")
 		}
+
+	case 3:
+		{
+			ButtonOperation.SetText("Query")
+			Related.SetReadOnly(false)
+			Source.SetReadOnly(false)
+			startTime.SetReadOnly(false)
+			endTime.SetReadOnly(false)
+			sortOrder.SetCheckable(true)
+			sortFieldName.SetCheckable(true)
+		}
+
+	}
+	if index != 3 {
+		Related.SetReadOnly(true)
+		Source.SetReadOnly(true)
+		startTime.SetReadOnly(true)
+		endTime.SetReadOnly(true)
+		sortOrder.SetCheckable(false)
+		sortFieldName.SetCheckable(false)
 	}
 
-	ID1.Clear()
+	Related.Clear()
+	Source.Clear()
+	startTime.Clear()
+	endTime.Clear()
 }
 
-func alignmentChanged(alignmentLineEdit *widgets.QLineEdit, index int) {
+func QueryChanged(QueryLineEdit *widgets.QLineEdit, index int) {
 	switch index {
 	case 0:
 		{
-			alignmentLineEdit.SetAlignment(core.Qt__AlignLeft)
+
 		}
 
 	case 1:
 		{
-			alignmentLineEdit.SetAlignment(core.Qt__AlignCenter)
+
 		}
 
 	case 2:
 		{
-			alignmentLineEdit.SetAlignment(core.Qt__AlignRight)
+
 		}
 	}
 }
@@ -422,11 +484,10 @@ func initTypes() {
 		}
 		err := objectType.RegisterMALBodyType(shortForms[i])
 		if err != nil {
-			fmt.Println("%d, cannot register COM object: %s",typesShortForms[i], err.Error())
+			fmt.Println("%d, cannot register COM object: %s", typesShortForms[i], err.Error())
 		}
 	}
-	
-	
+
 }
 func countDBElement() int64 {
 	// Open the database
@@ -547,7 +608,7 @@ func TestStoreOK(params []string, newValue string, newProvider string, newNetwor
 		Version: UOctet(1),
 		Number:  UShort(MAL_FLOAT_TYPE_SHORT_FORM),
 	}
-	
+
 	Identifiers := []*Identifier{}
 	for i := 0; i < len(params); i++ {
 		Identifiers = append(Identifiers, NewIdentifier(params[i]))
@@ -633,4 +694,51 @@ func Count(params []string) Long {
 		return 0
 	}
 	return *longList.GetElementAt(0).(*Long)
+}
+
+func TestQueryOK() {
+	// Check if the Archive table is initialized or not
+	err := checkAndInitDatabase()
+	if err != nil {
+		fmt.Println("failed")
+	}
+
+	// Variables to retrieve the return of this function
+	var errorsList *ServiceError
+	// Variable that defines the ArchiveService
+	var archiveService *ArchiveService
+	// Create the Archive Service
+	service := archiveService.CreateService()
+	archiveService = service.(*ArchiveService)
+
+	// Create parameters
+	var boolean = NewBoolean(true)
+	var objectType = ObjectType{
+		Area:    UShort(2),
+		Service: UShort(3),
+		Version: UOctet(1),
+		Number:  UShort(MAL_FLOAT_TYPE_SHORT_FORM),
+	}
+	archiveQueryList := NewArchiveQueryList(0)
+	//var domain = IdentifierList([]*Identifier{NewIdentifier("fr"), NewIdentifier("cnes"), NewIdentifier("archiveservice"), NewIdentifier("test")})
+	archiveQuery := &ArchiveQuery{
+		Related:       Long(0),
+		SortOrder:     NewBoolean(true),
+		SortFieldName: NewString("domain"),
+	}
+	archiveQueryList.AppendElement(archiveQuery)
+	var queryFilterList *CompositeFilterSetList
+
+	// Variable to retrieve the responses
+	var responses []interface{}
+
+	// Start the consumer
+	responses, errorsList, err = archiveService.Query(providerURL, boolean, objectType, *archiveQueryList, queryFilterList)
+	// Now, verify the responses
+	fmt.Println(responses)
+	fmt.Println(*responses[3].(*FloatList).GetElementAt(2).(*ObjectDetails))
+
+	if errorsList != nil || err != nil || responses == nil {
+		fmt.Println("failed")
+	}
 }
