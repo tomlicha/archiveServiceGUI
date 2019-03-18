@@ -21,7 +21,6 @@ import (
 	. "ccsdsmo-malgo-examples/archiveservice/archive/consumer"
 	. "ccsdsmo-malgo-examples/archiveservice/archive/service"
 	. "ccsdsmo-malgo-examples/archiveservice/data"
-	. "ccsdsmo-malgo-examples/archiveservice/data/tests"
 	. "ccsdsmo-malgo-examples/archiveservice/errors"
 	. "ccsdsmo-malgo/com"
 	. "ccsdsmo-malgo/mal"
@@ -46,6 +45,11 @@ const (
 	numberOfRows = 80
 )
 
+var (
+	typesShortForms = []Integer{MAL_FLOAT_TYPE_SHORT_FORM}
+	shortForms = []Long{MAL_FLOAT_SHORT_FORM}
+)
+
 // isDatabaseInitialized attribute is true when the database has been initialized
 var isDatabaseInitialized = false
 var malContext *Context = nil
@@ -53,6 +57,7 @@ var clientContext *malapi.ClientContext = nil
 
 func main() {
 	testSetup()
+	//initTypes()
 	widgets.NewQApplication(len(os.Args), os.Args)
 	var (
 		InitDB     = widgets.NewQGroupBox2("Init DB", nil)
@@ -154,7 +159,7 @@ func main() {
 			Result.SetText(TestStoreOK(params, newValue, newProvider, newNetwork))
 		}
 		if validatorComboBox.CurrentIndex() == 2 {
-			Result.SetText(string(Count(params)))
+			Result.SetText(strconv.FormatInt(int64(Count(params)),10))
 		}
 
 	})
@@ -213,7 +218,7 @@ func validatorChanged(ID1 *widgets.QLineEdit, ID2 *widgets.QLineEdit, ID3 *widge
 	case 2:
 		{
 			ButtonOperation.SetText("Count")
-			
+
 		}
 	}
 
@@ -242,7 +247,7 @@ func alignmentChanged(alignmentLineEdit *widgets.QLineEdit, index int) {
 // initDatabase is used to init the database
 func initDabase() error {
 	rand.Seed(time.Now().UnixNano())
-	
+
 	// Open the database
 	db, err := sql.Open("mysql", USERNAME+":"+PASSWORD+"@/"+DATABASE+"?parseTime=true")
 	if err != nil {
@@ -407,7 +412,23 @@ func testSetup() error {
 	return nil
 }
 
-func countDBElement() (int64){
+func initTypes() {
+	for i := 0; i < len(typesShortForms); i++ {
+		var objectType = ObjectType{
+			Area:    UShort(2),
+			Service: UShort(3),
+			Version: UOctet(1),
+			Number:  UShort(typesShortForms[i]),
+		}
+		err := objectType.RegisterMALBodyType(shortForms[i])
+		if err != nil {
+			fmt.Println("%d, cannot register COM object: %s",typesShortForms[i], err.Error())
+		}
+	}
+	
+	
+}
+func countDBElement() int64 {
 	// Open the database
 	db, err := sql.Open("mysql", USERNAME+":"+PASSWORD+"@/"+DATABASE+"?parseTime=true")
 	if err != nil {
@@ -455,11 +476,7 @@ func TestRetrieveOK(params []string) string {
 		Version: UOctet(1),
 		Number:  UShort(MAL_FLOAT_TYPE_SHORT_FORM),
 	}
-	
-	err = objectType.RegisterMALBodyType(MAL_FLOAT_SHORT_FORM)
-	if err!=nil {
-		fmt.Println("ValueOfSine.init, cannot register COM object: %s", err.Error())
-	}
+
 	Identifiers := []*Identifier{}
 	for i := 0; i < len(params); i++ {
 		Identifiers = append(Identifiers, NewIdentifier(params[i]))
@@ -508,7 +525,7 @@ func TestStoreOK(params []string, newValue string, newProvider string, newNetwor
 
 	}
 	itemsinDB := countDBElement()
-	fmt.Println(itemsinDB," items listed in DB")
+	fmt.Println(itemsinDB, " items listed in DB")
 	// Variables to retrieve the return of this function
 	var errorsList *ServiceError
 	// Variable that defines the ArchiveService
@@ -520,22 +537,23 @@ func TestStoreOK(params []string, newValue string, newProvider string, newNetwor
 	// Start the store consumer
 	// Create parameters
 	// Object that's going to be stored in the archive
-	var elementList = NewValueOfSineList(0)
-	value, err := strconv.ParseFloat(newValue, 64)
-	elementList.AppendElement(NewValueOfSine(Float(value)))
+	var elementList = NewFloatList(0)
+	value, err := strconv.ParseFloat(newValue, 32)
+	elementList.AppendElement(NewFloat(float32(value)))
 	var boolean = NewBoolean(true)
 	var objectType = ObjectType{
 		Area:    UShort(2),
 		Service: UShort(3),
 		Version: UOctet(1),
-		Number:  UShort(COM_VALUE_OF_SINE_TYPE_SHORT_FORM),
+		Number:  UShort(MAL_FLOAT_TYPE_SHORT_FORM),
 	}
+	
 	Identifiers := []*Identifier{}
 	for i := 0; i < len(params); i++ {
 		Identifiers = append(Identifiers, NewIdentifier(params[i]))
 	}
 	var identifierList = IdentifierList(Identifiers) // Object instance identifier
-	var nextID = itemsinDB+1;
+	var nextID = itemsinDB + 1
 	var objectInstanceIdentifier = *NewLong(nextID)
 	// Variables for ArchiveDetailsList
 	var objectKey = ObjectKey{
@@ -569,7 +587,7 @@ func TestStoreOK(params []string, newValue string, newProvider string, newNetwor
 	return "data correctly stored"
 }
 
-func Count(params []string) (Long){
+func Count(params []string) Long {
 
 	// Check if the Archive table is initialized or not
 	err := checkAndInitDatabase()
@@ -589,7 +607,7 @@ func Count(params []string) (Long){
 		Area:    UShort(2),
 		Service: UShort(3),
 		Version: UOctet(1),
-		Number:  UShort(COM_VALUE_OF_SINE_TYPE_SHORT_FORM),
+		Number:  UShort(MAL_FLOAT_TYPE_SHORT_FORM),
 	}
 	archiveQueryList := NewArchiveQueryList(0)
 	Identifiers := []*Identifier{}
@@ -603,7 +621,7 @@ func Count(params []string) (Long){
 		SortOrder: NewBoolean(true),
 	}
 	archiveQueryList.AppendElement(archiveQuery)
-	
+
 	var queryFilterList *CompositeFilterSetList
 
 	// Variable to retrieve the return of this function
@@ -614,6 +632,5 @@ func Count(params []string) (Long){
 	if errorsList != nil || err != nil || longList == nil {
 		return 0
 	}
-
 	return *longList.GetElementAt(0).(*Long)
 }
